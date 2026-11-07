@@ -1,0 +1,22 @@
+{
+  "id": "neodex.inondation",
+  "name": "Inondation",
+  "version": "1.0.0",
+  "author": "NDesumeur",
+  "description": "La tache du coin prend la couleur que tu choisis et avale ses voisines de même couleur. Couvre toute la grille en un nombre de coups limité.",
+  "icon": "icon.png",
+  "entry": "index.js",
+  "view": "inondation",
+  "neobase": ">=4.0.0",
+  "type": "app",
+  "category": "Jeux",
+  "syncMode": "progression",
+  "syncInfo": "Niveau atteint, records de coups.",
+  "mobile": false,
+  "system": false,
+  "dependencies": {},
+  "sdk": "2.1.0",
+  "permissions": [
+    "storage"
+  ]
+}
