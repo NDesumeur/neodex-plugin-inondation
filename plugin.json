@@ -1,7 +1,7 @@
 {
   "id": "neodex.inondation",
   "name": "Inondation",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "NDesumeur",
   "description": "Casse-tête de couleurs : ta tache part du coin, prend la couleur choisie et avale ses voisines de même couleur. Couvre les 196 cases de la grille dans le nombre de coups permis, de 30 au niveau 1 jusqu'à 22. Une grille fixe par niveau pour battre ton record, ou des grilles au hasard ; couleurs au clic ou aux touches 1 à 6, avec un motif par couleur.",
   "icon": "icon.png",
