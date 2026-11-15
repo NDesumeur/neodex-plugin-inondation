@@ -2,10 +2,10 @@
 // Jeu NeoDex en pixel art dessiné à la main (police bitmap, cadres et boutons en pixels). Il tourne dans le bac à sable de NeoDex.
 const HTML = `<div class="appWrap wide">
   <div class="agHead"><span class="label">Inondation</span><span class="hint">Clic sur une couleur (ou une case de cette couleur) · touches 1 à 6</span></div>
-  <div class="gMain"><div class="gameBox"><canvas id="gc" width="200" height="220"></canvas></div>
+  <div class="gMain"><div class="gameBox"><canvas id="gc" width="256" height="284" role="img" aria-label="Grille d'Inondation"></canvas></div>
     <div class="gSide">
       <div class="sysCard"><b>RECORDS</b><div class="gStats" id="gStats"></div></div>
-      <div class="row"><button class="btn main" id="gNew">NOUVELLE PARTIE</button><button class="btn" id="inPrev">◀</button><button class="btn" id="inNext">▶</button></div>
+      <div class="row"><button class="btn main" id="gNew">NOUVELLE PARTIE</button><button class="btn" id="inPrev">◀</button><button class="btn" id="inNext">▶</button><button class="btn" id="gFs">PLEIN ÉCRAN</button></div>
       <label class="row"><input type="checkbox" id="inRnd"> Grilles au hasard (nouveau à chaque partie)</label>
       <div class="hint">Ta tache part du coin en haut à gauche, entourée d'un liseré blanc.</div><div class="hint">Chaque couleur a aussi son motif gravé, pour les distinguer sans les couleurs.</div>
     </div></div>
@@ -17,7 +17,9 @@ const CSS = `.gMain{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
 .gSide .sysCard{display:flex;flex-direction:column}
 .gStats{display:grid;grid-template-columns:1fr auto;gap:4px 14px}
 .gStats b{text-align:right}
-.gameBox canvas{max-width:480px;aspect-ratio:200/220}`;
+.gameBox canvas{width:min(100%,max(300px,calc((100vh - 190px) * 256 / 284)));height:auto;aspect-ratio:256/284}
+.gameBox:fullscreen{padding:0}
+.gameBox:fullscreen canvas{width:min(100vw,calc(100vh * 256 / 284))}`;
 /* ---------- l'habillage pixel art, dessiné à la main : police bitmap (accents compris), cadres, boutons, icônes ----------
    Tout est en pixels pleins, agrandis par 2 sans lissage : aucun dégradé, aucune ombre floue. */
 const PXK = (() => {
@@ -322,7 +324,7 @@ const clock = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStar
 // petits outils communs aux jeux : une toile pré-dessinée, la position du pointeur dans le canevas, un bip
 const cnv = (w, h, fn) => { const c = el('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; fn(g); return c; };
 const spr = (rows, pal) => cnv(Math.max(...rows.map(r => r.length)), rows.length, g => sprite(g, rows, 0, 0, pal));
-const W = 200, H = 220, cv = $('gc'), g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+const W = 256, H = 284, cv = $('gc'), g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
 const cpos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * W, (e.clientY - r.top) / r.height * H]; };
 let actx = null;
 const beep = (f, d = .1, type = 'square', slide = 0, vol = .08) => { try { actx ??= new AudioContext(); const o = actx.createOscillator(), gn = actx.createGain(), t = actx.currentTime; o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + d); gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(gn).connect(actx.destination); o.start(t); o.stop(t + d + .02); } catch {} };
@@ -330,18 +332,19 @@ const keyOk = e => view.classList.contains('on') && !/INPUT|SELECT|TEXTAREA/.tes
 const showStats = rows => $('gStats').replaceChildren(...rows.flatMap(([a, b]) => [el('span', '', a), el('b', '', String(b))]));
 
 /* ---------- Inondation : la tache du coin en haut à gauche prend la couleur choisie et avale ses voisines de même couleur. Tout couvrir en peu de coups. ---------- */
-const IN = {N: 14, C: 12, X0: 16, Y0: 18, COLS: [['#ff4a5a', '#ffb0b8', '#a02030'], ['#ffd84a', '#fff4b0', '#a07a10'], ['#5fdf6a', '#c8ffc8', '#2a8a3a'], ['#3f8aff', '#b0d0ff', '#1a4aa0'], ['#b07aff', '#e4d0ff', '#6a3ab0'], ['#ff9a3d', '#ffe0b0', '#a05a10']]};
-const IN_TILE = IN.COLS.map(([m, l, d], k) => cnv(12, 12, b => {  // une tuile de céramique par couleur, chacune avec son motif gravé (pour qui distingue mal les couleurs)
-  px(b, d, 0, 0, 12, 12); px(b, m, 1, 1, 10, 10); px(b, l, 1, 1, 10, 1); px(b, l, 1, 1, 1, 10);
-  const mark = [['....', '.##.', '.##.', '....'], ['#..#', '....', '....', '#..#'], ['.#..', '###.', '.#..', '....'], ['#...', '.#..', '..#.', '...#'], ['.##.', '#..#', '#..#', '.##.'], ['####', '....', '####', '....']][k];
-  mark.forEach((r, y) => [...r].forEach((c, x) => { if (c === '#') px(b, d, 4 + x, 4 + y); }));
-}));
+const IN = {N: 14, C: 16, X0: 16, Y0: 22, COLS: [['#ff4a5a', '#ffb0b8', '#a02030'], ['#ffd84a', '#fff4b0', '#a07a10'], ['#5fdf6a', '#c8ffc8', '#2a8a3a'], ['#3f8aff', '#b0d0ff', '#1a4aa0'], ['#b07aff', '#e4d0ff', '#6a3ab0'], ['#ff9a3d', '#ffe0b0', '#a05a10']]};
+const IN_MARK = [['....', '.##.', '.##.', '....'], ['#..#', '....', '....', '#..#'], ['.#..', '###.', '.#..', '....'], ['#...', '.#..', '..#.', '...#'], ['.##.', '#..#', '#..#', '.##.'], ['####', '....', '####', '....']];
+const inTile = (k, w, h) => cnv(w, h, b => {  // une tuile de céramique par couleur, chacune avec son motif gravé (pour qui distingue mal les couleurs)
+  const [m, l, d] = IN.COLS[k]; px(b, d, 0, 0, w, h); px(b, m, 1, 1, w - 2, h - 2); px(b, l, 1, 1, w - 2, 1); px(b, l, 1, 1, 1, h - 2); px(b, l, 2, 2, 2, 1);
+  const ox = Math.floor((w - 8) / 2), oy = Math.floor((h - 8) / 2); IN_MARK[k].forEach((r, y) => [...r].forEach((c, x) => { if (c === '#') px(b, d, ox + x * 2, oy + y * 2, 2, 2); }));
+});
+const IN_TILE = IN.COLS.map((_, k) => inTile(k, IN.C, IN.C)), IN_BTN = IN.COLS.map((_, k) => inTile(k, 33, 20));
 const ins = gstore('inondation', {level: 1, top: 1, won: 0, games: 0});
 let fl = null;
 const inLimit = lv => Math.max(22, 30 - Math.floor((lv - 1) / 4));  // un joueur glouton (un coup d'avance) finit en 27 à 32 coups
 function inNew(level = ins.level) {
   ins.level = level; saveGames(); const r = seeded(ins.rnd ? Math.floor(Math.random() * 1e9) : level * 4391 + 7);
-  fl = Object.assign(fl || {tick: 0, raf: 0}, {mode: 'play', grid: Array.from({length: IN.N}, () => Array.from({length: IN.N}, () => Math.floor(r() * 6))), moves: 0, limit: inLimit(level), wave: [], endAt: 0});
+  fl = Object.assign(fl || {tick: 0, raf: 0}, {mode: 'play', grid: Array.from({length: IN.N}, () => Array.from({length: IN.N}, () => Math.floor(r() * 6))), moves: 0, limit: inLimit(level), flow: new Map(), endAt: 0});
   fl.own = inRegion(fl.grid); inInfo();
 }
 function inRegion(grid) {  // les cases reliées au coin, de la même couleur que lui
@@ -349,42 +352,63 @@ function inRegion(grid) {  // les cases reliées au coin, de la même couleur qu
   while (q.length) { const [x, y] = q.pop(); for (const [a, b] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) if (grid[b]?.[a] === c && !seen.has(a + ',' + b)) { seen.add(a + ',' + b); q.push([a, b]); } }
   return seen;
 }
+function inDist(own) {  // la distance de chaque case de ta tache au coin, en suivant la tache (l'eau coule par là)
+  const d = new Map([['0,0', 0]]), q = [[0, 0]];
+  for (let i = 0; i < q.length; i++) { const [x, y] = q[i], n = d.get(x + ',' + y); for (const k of [(x + 1) + ',' + y, (x - 1) + ',' + y, x + ',' + (y + 1), x + ',' + (y - 1)]) if (own.has(k) && !d.has(k)) { d.set(k, n + 1); q.push(k.split(',').map(Number)); } }
+  return d;
+}
 function inPlay(c) {
   if (fl.mode !== 'play' || c === fl.grid[0][0]) return;
-  const before = fl.own.size; for (const k of fl.own) { const [x, y] = k.split(',').map(Number); fl.grid[y][x] = c; }
+  const before = fl.own.size, old = fl.grid.map(r => r.slice()); for (const k of fl.own) { const [x, y] = k.split(',').map(Number); fl.grid[y][x] = c; }
   fl.own = inRegion(fl.grid); fl.moves++;
-  for (const k of fl.own) { const [x, y] = k.split(',').map(Number); fl.wave.push({x, y, t: fl.tick + (x + y) * 1.2}); }
+  fl.flow = new Map(); for (const [k, dist] of inDist(fl.own)) { const [x, y] = k.split(',').map(Number); fl.flow.set(k, {from: old[y][x], t: fl.tick + dist * .9}); }
   beep(300 + fl.own.size * 3, .06, 'triangle', 0, .05 + Math.min(.05, (fl.own.size - before) / 400));
   if (fl.own.size === IN.N * IN.N) { fl.mode = 'won'; fl.endAt = fl.tick; ins.won++; ins.games++; if (ins.level >= ins.top) ins.top = ins.level + 1; best('inond' + ins.level, -fl.moves); saveGames(); [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, .14, 'triangle'), i * 100)); }
   else if (fl.moves >= fl.limit) { fl.mode = 'over'; fl.endAt = fl.tick; ins.games++; saveGames(); beep(160, .4, 'sawtooth', 80, .08); }
   inInfo();
 }
 const IN_BG = cnv(W, H, b => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px(b, (x * 3 + y * 5) % 11 === 0 ? '#0e2240' : (x + y) % 2 ? '#0a1a34' : '#08162c', x, y); px(b, '#05010b', IN.X0 - 3, IN.Y0 - 3, IN.N * IN.C + 6, IN.N * IN.C + 6); px(b, '#2e5a9a', IN.X0 - 2, IN.Y0 - 2, IN.N * IN.C + 4, 1); });
-const inPal = k => [IN.X0 + k * 29, IN.Y0 + IN.N * IN.C + 10];
+const inPal = k => [IN.X0 + k * 38, IN.Y0 + IN.N * IN.C + 12];
 function inDraw() {
   g.drawImage(IN_BG, 0, 0);
-  for (let y = 0; y < IN.N; y++) for (let x = 0; x < IN.N; x++) g.drawImage(IN_TILE[fl.grid[y][x]], IN.X0 + x * IN.C, IN.Y0 + y * IN.C);
-  fl.wave = fl.wave.filter(w => fl.tick - w.t < 10); for (const w of fl.wave) if (fl.tick >= w.t) { g.globalAlpha = .5 * (1 - (fl.tick - w.t) / 10); px(g, '#ffffff', IN.X0 + w.x * IN.C + 1, IN.Y0 + w.y * IN.C + 1, 10, 10); g.globalAlpha = 1; }
+  const C = IN.C;
+  for (let y = 0; y < IN.N; y++) for (let x = 0; x < IN.N; x++) {
+    const X = IN.X0 + x * C, Y = IN.Y0 + y * C, f = fl.flow.get(x + ',' + y), p = f ? (fl.tick - f.t) / 10 : 9;
+    if (p >= 1.6 || f.from === fl.grid[y][x] && p >= 1) { g.drawImage(IN_TILE[fl.grid[y][x]], X, Y); continue; }
+    const h = Math.max(0, Math.min(C, Math.round(p * C))); g.drawImage(IN_TILE[f.from], X, Y);  // l'ancienne couleur, puis la nouvelle qui monte depuis le bas
+    if (h) { g.drawImage(IN_TILE[fl.grid[y][x]], 0, C - h, C, h, X, Y + C - h, C, h); if (h < C) { px(g, IN.COLS[fl.grid[y][x]][1], X + 1, Y + C - h, C - 2, 1); px(g, '#ffffff', X + 2 + (fl.tick >> 1) % (C - 6), Y + C - h, 3, 1); } }
+    else if (p > -.3) px(g, '#ffffff', X + 3, Y + C - 2, C - 6, 1);
+    if (p >= 1 && p < 1.6) { g.globalAlpha = .35 * (1.6 - p); px(g, '#ffffff', X + 1, Y + 1, C - 2, C - 2); g.globalAlpha = 1; }  // l'éclat quand la case est pleine
+  }
+  if (fl.mode === 'play') for (const k of fl.own) { if (((k.length * 7 + fl.tick) >> 3) % 23) continue; const [x, y] = k.split(',').map(Number); px(g, '#ffffff', IN.X0 + x * C + 4 + (fl.tick >> 2) % 6, IN.Y0 + y * C + 5, 3, 1); }  // des reflets qui passent sur l'eau
   for (const k of fl.own) { const [x, y] = k.split(',').map(Number); if (!fl.own.has(x + ',' + (y - 1))) px(g, '#ffffff', IN.X0 + x * IN.C, IN.Y0 + y * IN.C, IN.C, 1); if (!fl.own.has((x - 1) + ',' + y)) px(g, '#ffffff', IN.X0 + x * IN.C, IN.Y0 + y * IN.C, 1, IN.C); }  // le contour de ta tache
-  for (let k = 0; k < 6; k++) { const [x, y] = inPal(k), on = fl.hover === k; px(g, '#05010b', x - 1, y - 1, 26, 18); g.drawImage(IN_TILE[k], x, y, 24, 16); if (on) px(g, '#ffffff', x - 1, y + 17, 26, 1); if (k === fl.grid[0][0]) px(g, '#05010b', x + 9, y + 5, 6, 6); }
-  pxFont(g, 'COUPS ' + fl.moves + ' / ' + fl.limit, IN.X0, 12, fl.limit - fl.moves <= 3 ? '#ff4a5a' : '#ffffff', 6); pxFont(g, 'NIVEAU ' + ins.level, W - 8, 12, '#a8c0e0', 6, 'right');
-  if (fl.mode === 'won' && fl.tick - fl.endAt > 20) gameText(g, W, [['TOUT EST INONDÉ !', '#5fdf6a', 10], [fl.moves + ' coups sur ' + fl.limit, '#ffffff'], ['Clic : niveau suivant', '#ffd84a']], 90);
-  if (fl.mode === 'over' && fl.tick - fl.endAt > 20) gameText(g, W, [['PLUS DE COUPS', '#ff4a5a', 10], [Math.round(fl.own.size / (IN.N * IN.N) * 100) + ' % couvert', '#ffffff'], ['Clic : réessayer', '#ffd84a']], 90);
+  for (let k = 0; k < 6; k++) { const [x, y] = inPal(k), on = fl.hover === k && fl.mode === 'play', cur = k === fl.grid[0][0];
+    px(g, on ? '#ffffff' : '#05010b', x - 1, y - 1 - (on ? 1 : 0), 35, 22); g.drawImage(IN_BTN[k], x, y - (on ? 1 : 0)); PXK.fill(g, String(k + 1), x + 4, y + 12, IN.COLS[k][2], 1);
+    if (cur) { g.globalAlpha = .6; px(g, '#05010b', x, y, 33, 20); g.globalAlpha = 1; } }
+  pxFont(g, 'COUPS ' + fl.moves + ' / ' + fl.limit, IN.X0, 15, fl.limit - fl.moves <= 3 ? '#ff4a5a' : '#ffffff', 8); pxFont(g, 'NIVEAU ' + ins.level, W - 16, 15, '#a8c0e0', 8, 'right');
+  const end = (title, col, lines) => { px(g, 'rgba(3,10,20,.8)', 0, 96, W, 82); PXK.fill(g, title, W / 2 + 2, 126, '#05010b', 2, 'center'); PXK.fill(g, title, W / 2, 124, col, 2, 'center'); lines.forEach(([t, c], i) => pxFont(g, t, W / 2, 146 + i * 16, c, 8, 'center')); };
+  if (fl.mode === 'won' && fl.tick - fl.endAt > 30) end('TOUT EST INONDÉ !', '#5fdf6a', [[fl.moves + ' coups sur ' + fl.limit, '#ffffff'], ['Clic : niveau suivant', '#ffd84a']]);
+  if (fl.mode === 'over' && fl.tick - fl.endAt > 30) end('PLUS DE COUPS', '#ff4a5a', [[Math.round(fl.own.size / (IN.N * IN.N) * 100) + ' % couvert', '#ffffff'], ['Clic : réessayer', '#ffd84a']]);
+  cv.setAttribute('aria-label', 'Inondation, niveau ' + ins.level + ' : coups ' + fl.moves + ' sur ' + fl.limit + ', ' + Math.round(fl.own.size / (IN.N * IN.N) * 100) + ' % couvert');
 }
-const inAt = e => { const [x, y] = cpos(e); for (let k = 0; k < 6; k++) { const [px0, py0] = inPal(k); if (x >= px0 && x < px0 + 24 && y >= py0 && y < py0 + 16) return k; } const cx = Math.floor((x - IN.X0) / IN.C), cy = Math.floor((y - IN.Y0) / IN.C); return cx >= 0 && cy >= 0 && cx < IN.N && cy < IN.N ? fl.grid[cy][cx] : -1; };
+const inAt = e => { const [x, y] = cpos(e); for (let k = 0; k < 6; k++) { const [px0, py0] = inPal(k); if (x >= px0 && x < px0 + 33 && y >= py0 && y < py0 + 20) return k; } const cx = Math.floor((x - IN.X0) / IN.C), cy = Math.floor((y - IN.Y0) / IN.C); return cx >= 0 && cy >= 0 && cx < IN.N && cy < IN.N ? fl.grid[cy][cx] : -1; };
 cv.onpointermove = e => { if (fl) fl.hover = inAt(e); };
-cv.onpointerdown = e => { e.preventDefault(); if (!fl) return; if (fl.mode !== 'play') { if (fl.tick - fl.endAt > 20) inNew(fl.mode === 'won' ? ins.level + 1 : ins.level); return; } const k = inAt(e); if (k >= 0) inPlay(k); };
+cv.onpointerdown = e => { e.preventDefault(); if (!fl) return; if (fl.mode !== 'play') { if (fl.tick - fl.endAt > 30) inNew(fl.mode === 'won' ? ins.level + 1 : ins.level); return; } const k = inAt(e); if (k >= 0) inPlay(k); };
 document.addEventListener('keydown', e => { if (!keyOk(e) || !fl) return; const k = '123456'.indexOf(e.key); if (k >= 0) inPlay(k); if (e.key === ' ' && fl.mode !== 'play') { e.preventDefault(); inNew(fl.mode === 'won' ? ins.level + 1 : ins.level); } });
 function inInfo() { const b = games.best['inond' + ins.level]; showStats([['Niveau le plus loin', ins.top], ['Record de ce niveau', b != null ? -b + ' coups' : '—'], ['Grilles réussies', ins.won + ' / ' + ins.games]]); }
 $('gNew').onclick = () => { inNew(ins.level); $('gNew').blur(); };
 $('inRnd').checked = !!ins.rnd; $('inRnd').onchange = () => { ins.rnd = $('inRnd').checked; saveGames(); inNew(ins.level); $('inRnd').blur(); };  // plans au hasard : la taille suit toujours le niveau
 
 $('inPrev').onclick = () => { if (ins.level > 1) inNew(ins.level - 1); $('inPrev').blur(); }; $('inNext').onclick = () => { if (ins.level < ins.top) inNew(ins.level + 1); $('inNext').blur(); };
-{  // vérification : jouer la couleur la plus rentable finit toujours la grille, pas très loin de la limite
-  const keep = fl, ks = {...ins}, kb = {...games.best}; let ok = true;
-  for (const lv of [1, 7, 20]) { fl = null; inNew(lv); let n = 0; while (fl.mode === 'play' && n < 60) { let bk = 0, bs = -1; for (let c = 0; c < 6; c++) { if (c === fl.grid[0][0]) continue; const gg = fl.grid.map(r => r.slice()); for (const k of fl.own) { const [x, y] = k.split(',').map(Number); gg[y][x] = c; } const s = inRegion(gg).size; if (s > bs) { bs = s; bk = c; } } fl.limit = 99; inPlay(bk); n++; } ok &&= fl.mode === 'won' && n <= inLimit(lv) + 12; }
-  console.assert(ok, 'inondation'); fl = keep; Object.assign(ins, ks); games.best = kb;
+$('gFs').onclick = () => { const box = cv.parentElement; document.fullscreenElement ? document.exitFullscreen() : box.requestFullscreen?.().catch(() => {}); $('gFs').blur(); };
+function inCheck() {  // vérification : jouer la couleur la plus rentable finit toujours la grille, pas très loin de la limite ; l'eau part du coin
+  const keep = fl, ks = {...ins}, kb = {...games.best}; let ok = true, flow = true;
+  for (const lv of [1, 7, 20]) { fl = null; inNew(lv); let n = 0; while (fl.mode === 'play' && n < 60) { let bk = 0, bs = -1; for (let c = 0; c < 6; c++) { if (c === fl.grid[0][0]) continue; const gg = fl.grid.map(r => r.slice()); for (const k of fl.own) { const [x, y] = k.split(',').map(Number); gg[y][x] = c; } const s = inRegion(gg).size; if (s > bs) { bs = s; bk = c; } } fl.limit = 99; inPlay(bk); n++;
+      if (n === 3) { const f = fl.flow; flow &&= f.size === fl.own.size && f.get('0,0').t === fl.tick && [...f.values()].every(v => v.t >= fl.tick); } } ok &&= fl.mode === 'won' && n <= inLimit(lv) + 12; }
+  fl = keep; Object.assign(ins, ks); games.best = kb;
+  return [ok ? '' : 'grille non finie', flow ? '' : 'écoulement', inPal(5)[0] + 33 <= W && inPal(0)[1] + 20 <= H ? '' : 'palette hors cadre'].filter(Boolean).join(' | ') || 'ok';
 }
+{ const c = inCheck(); console.assert(c === 'ok', 'inondation', c); cv.__in = {check: inCheck, st: () => fl, play: k => inPlay(k), again: () => inNew(ins.level), ins}; }
 ctx.onOpen(() => { if (!fl) inNew(); gameLoop(fl, 'inondation', () => {}, inDraw); inInfo(); });
 
 }

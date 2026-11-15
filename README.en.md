@@ -7,11 +7,13 @@ A colour puzzle: your patch starts in the corner of the grid, takes the colour y
 ## Controls
 
 - **Click a colour** in the palette, or **a cell** of that colour in the grid.
-- Keys **1 to 6**: choose a colour with the keyboard.
+- Keys **1 to 6**: choose a colour with the keyboard (each palette button shows its number).
+- **Full screen**: the button of the same name; Escape to leave it. Otherwise the grid takes all the room the window leaves.
 - **Space** or a click after the end: next level (or replay the same one if you failed).
 
 ## Rules
 
+- On each move, **the water flows** from the corner: each cell of your patch fills with the new colour from the bottom, just after its neighbour, then shines when full.
 - The grid has 14 × 14 cells in 6 colours. Your patch starts in the top-left corner, outlined in white.
 - On each move, your whole patch takes the chosen colour and grows by every neighbouring cell of that colour, which become yours.
 - You must cover the whole grid within the **allowed number of moves**, shown at the top (it turns red when three are left).

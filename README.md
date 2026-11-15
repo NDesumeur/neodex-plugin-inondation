@@ -7,11 +7,13 @@ Un casse-tête de couleurs : ta tache part du coin de la grille, prend la couleu
 ## Commandes
 
 - **Clic sur une couleur** de la palette, ou **sur une case** de cette couleur dans la grille.
-- Touches **1 à 6** : choisir une couleur au clavier.
+- Touches **1 à 6** : choisir une couleur au clavier (chaque bouton de la palette porte son chiffre).
+- **Plein écran** : le bouton du même nom ; Échap pour en sortir. Hors plein écran, la grille prend toute la place que laisse la fenêtre.
 - **Espace** ou un clic après la fin : niveau suivant (ou rejouer le même si c'est raté).
 
 ## Règles
 
+- À chaque coup, **l'eau s'écoule** depuis le coin : chaque case de ta tache se remplit de la nouvelle couleur par le bas, un peu après sa voisine, puis brille quand elle est pleine.
 - La grille fait 14 × 14 cases de 6 couleurs. Ta tache commence dans le coin en haut à gauche, entourée d'un liseré blanc.
 - À chaque coup, ta tache entière prend la couleur choisie et s'agrandit de toutes les cases voisines de cette couleur, qui deviennent les tiennes.
 - Il faut couvrir toute la grille dans le **nombre de coups permis**, affiché en haut (il passe au rouge quand il en reste trois).
