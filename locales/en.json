@@ -50,7 +50,6 @@
  "KWWWWWWWWWWK": "KWWWWWWWWWWK",
  "NIVEAU": "LEVEL",
  "NOUVELLE PARTIE": "NEW GAME",
- "Niveau atteint, records de coups.": "Level reached, record hits.",
  "Niveau le plus loin": "Farthest level",
  "Nt": "Nt",
  "Oa": "Oa",
@@ -68,5 +67,6 @@
  "Ug": "Ug",
  "coups sur": "hits on",
  "Grille d'Inondation": "Flood grid",
- "écoulement": "flow"
+ "écoulement": "flow",
+ "Rien n'est synchronisé : tes records restent sur cet appareil.": "Nothing is synced: your records stay on this device."
 }
