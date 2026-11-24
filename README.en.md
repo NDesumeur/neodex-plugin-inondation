@@ -4,6 +4,10 @@ A colour puzzle: your patch starts in the corner of the grid, takes the colour y
 
 *Version française : [README.md](README.md)*
 
+## Duel and daily grid (new in 1.2.0)
+
+The duel: each player starts from a corner, you cannot take the other’s colour, and more than half of the grid wins. Against the computer, which plays by itself, or two players on the same screen. The daily grid is the same for everyone, in 28 moves, with a day streak.
+
 ## Controls
 
 - **Click a colour** in the palette, or **a cell** of that colour in the grid.

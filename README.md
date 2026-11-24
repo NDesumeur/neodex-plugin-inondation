@@ -4,6 +4,10 @@ Un casse-tête de couleurs : ta tache part du coin de la grille, prend la couleu
 
 *English version: [README.en.md](README.en.md)*
 
+## Duel et grille du jour (nouveau en 1.2.0)
+
+Le duel : chacun part de son coin, on ne peut pas prendre la couleur de l’autre, et plus de la moitié de la grille gagne. Contre l’ordi, qui joue tout seul, ou à deux sur le même écran. La grille du jour est la même pour tout le monde, en 28 coups, avec une série de jours.
+
 ## Commandes
 
 - **Clic sur une couleur** de la palette, ou **sur une case** de cette couleur dans la grille.

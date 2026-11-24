@@ -6,6 +6,7 @@ const HTML = `<div class="appWrap wide">
     <div class="gSide">
       <div class="sysCard"><b>RECORDS</b><div class="gStats" id="gStats"></div></div>
       <div class="row"><button class="btn main" id="gNew">NOUVELLE PARTIE</button><button class="btn" id="inPrev">◀</button><button class="btn" id="inNext">▶</button><button class="btn" id="gFs">PLEIN ÉCRAN</button></div>
+      <label class="row">Mode <select class="gSel" id="inMode"><option value="solo">Seul · niveaux</option><option value="jour">Grille du jour</option><option value="ordi">Duel contre l’ordi</option><option value="deux">Duel à deux, sur le même écran</option></select></label>
       <label class="row"><input type="checkbox" id="inRnd"> Grilles au hasard (nouveau à chaque partie)</label>
       <div class="hint">Ta tache part du coin en haut à gauche, entourée d'un liseré blanc.</div><div class="hint">Chaque couleur a aussi son motif gravé, pour les distinguer sans les couleurs.</div>
     </div></div>
@@ -342,29 +343,61 @@ const IN_TILE = IN.COLS.map((_, k) => inTile(k, IN.C, IN.C)), IN_BTN = IN.COLS.m
 const ins = gstore('inondation', {level: 1, top: 1, won: 0, games: 0});
 let fl = null;
 const inLimit = lv => Math.max(22, 30 - Math.floor((lv - 1) / 4));  // un joueur glouton (un coup d'avance) finit en 27 à 32 coups
+const inDay = (k = 0) => { const d = new Date(Date.now() - k * 864e5); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 function inNew(level = ins.level) {
-  ins.level = level; saveGames(); const r = seeded(ins.rnd ? Math.floor(Math.random() * 1e9) : level * 4391 + 7);
-  fl = Object.assign(fl || {tick: 0, raf: 0}, {mode: 'play', grid: Array.from({length: IN.N}, () => Array.from({length: IN.N}, () => Math.floor(r() * 6))), moves: 0, limit: inLimit(level), flow: new Map(), endAt: 0});
+  const m = ins.mode || 'solo', duel = m === 'ordi' || m === 'deux', N = IN.N; if (m === 'solo') ins.level = level; saveGames();
+  const r = seeded(m === 'jour' ? +inDay().replace(/-/g, '') : duel || ins.rnd ? Math.floor(Math.random() * 1e9) : level * 4391 + 7);
+  fl = Object.assign(fl || {tick: 0, raf: 0}, {mode: 'play', grid: Array.from({length: N}, () => Array.from({length: N}, () => Math.floor(r() * 6))), moves: 0, limit: m === 'jour' ? 28 : inLimit(level), flow: new Map(), endAt: 0, daily: m === 'jour', duel: null});
+  clearTimeout(inAiT);
+  if (duel) { if (fl.grid[N - 1][N - 1] === fl.grid[0][0]) fl.grid[N - 1][N - 1] = (fl.grid[0][0] + 1 + Math.floor(r() * 5)) % 6; fl.duel = {ai: m === 'ordi', turn: 0, own2: inRegion(fl.grid, N - 1, N - 1), res: null}; }
   fl.own = inRegion(fl.grid); inInfo();
 }
-function inRegion(grid) {  // les cases reliées au coin, de la même couleur que lui
-  const c = grid[0][0], seen = new Set(['0,0']), q = [[0, 0]];
+// le duel : chacun part de son coin (toi en haut à gauche, l’autre en bas à droite) ; on ne peut pas prendre la couleur de l’autre ; plus de la moitié de la grille gagne
+let inAiT = 0;
+function inDuel(c, ai = false) {
+  const d = fl.duel, me = d.turn, N = IN.N, [cx, cy] = me ? [N - 1, N - 1] : [0, 0], mine = me ? d.own2 : fl.own;
+  if (d.ai && me === 1 && !ai) return;
+  if (c === fl.grid[0][0] || c === fl.grid[N - 1][N - 1]) { beep(140, .06); return; }
+  const old = fl.grid.map(r => r.slice()); for (const k of mine) { const [x, y] = k.split(',').map(Number); fl.grid[y][x] = c; }
+  const reg = inRegion(fl.grid, cx, cy), grow = reg.size - mine.size; if (me) d.own2 = reg; else fl.own = reg; fl.moves++;
+  fl.flow = new Map(); for (const [k, dist] of inDist(reg, cx, cy)) { const [x, y] = k.split(',').map(Number); fl.flow.set(k, {from: old[y][x], t: fl.tick + dist * .9}); }
+  beep(me ? 220 + reg.size * 2 : 300 + reg.size * 3, .06, 'triangle', 0, .05 + Math.min(.05, grow / 400));
+  const a = fl.own.size, b = d.own2.size, tot = N * N;
+  if (a * 2 > tot || b * 2 > tot || a + b === tot) {
+    d.res = a > b ? 0 : b > a ? 1 : -1; fl.mode = d.res === 0 || (!d.ai && d.res === 1) ? 'won' : 'over'; fl.endAt = fl.tick;
+    if (d.ai) { const s = (ins.duel ??= {w: 0, l: 0, d: 0}); s[d.res === 0 ? 'w' : d.res === 1 ? 'l' : 'd']++; saveGames(); }
+    [523, 659, 784].forEach((f, i) => setTimeout(() => beep(d.res === 1 && d.ai ? f / 2 : f, .14, 'triangle'), i * 110));
+  } else { d.turn = 1 - me; if (d.ai && d.turn === 1) inAiT = setTimeout(inAi, 550); }
+  inInfo();
+}
+const inGain = (grid, own, c, cx, cy) => { const gg = grid.map(r => r.slice()); for (const k of own) { const [x, y] = k.split(',').map(Number); gg[y][x] = c; } return inRegion(gg, cx, cy).size; };
+function inAi() {  // l’ordi prend la couleur qui lui rapporte le plus ; à égalité, celle qui en laisse le moins à toi au coup d’après
+  if (!fl?.duel || fl.mode !== 'play' || fl.duel.turn !== 1) return; const N = IN.N, d = fl.duel, ban = [fl.grid[0][0], fl.grid[N - 1][N - 1]]; let bk = -1, bs = -1e9;
+  for (let c = 0; c < 6; c++) { if (ban.includes(c)) continue; const gg = fl.grid.map(r => r.slice()); for (const k of d.own2) { const [x, y] = k.split(',').map(Number); gg[y][x] = c; }
+    let you = 0; for (let e = 0; e < 6; e++) if (e !== c && e !== fl.grid[0][0]) you = Math.max(you, inGain(gg, fl.own, e, 0, 0));
+    const sc = inRegion(gg, N - 1, N - 1).size * 3 - you; if (sc > bs) { bs = sc; bk = c; } }
+  if (bk >= 0) inDuel(bk, true);
+}
+function inRegion(grid, x0 = 0, y0 = 0) {  // les cases reliées au coin, de la même couleur que lui
+  const c = grid[y0][x0], seen = new Set([x0 + ',' + y0]), q = [[x0, y0]];
   while (q.length) { const [x, y] = q.pop(); for (const [a, b] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) if (grid[b]?.[a] === c && !seen.has(a + ',' + b)) { seen.add(a + ',' + b); q.push([a, b]); } }
   return seen;
 }
-function inDist(own) {  // la distance de chaque case de ta tache au coin, en suivant la tache (l'eau coule par là)
-  const d = new Map([['0,0', 0]]), q = [[0, 0]];
+function inDist(own, x0 = 0, y0 = 0) {  // la distance de chaque case de ta tache au coin, en suivant la tache (l'eau coule par là)
+  const d = new Map([[x0 + ',' + y0, 0]]), q = [[x0, y0]];
   for (let i = 0; i < q.length; i++) { const [x, y] = q[i], n = d.get(x + ',' + y); for (const k of [(x + 1) + ',' + y, (x - 1) + ',' + y, x + ',' + (y + 1), x + ',' + (y - 1)]) if (own.has(k) && !d.has(k)) { d.set(k, n + 1); q.push(k.split(',').map(Number)); } }
   return d;
 }
 function inPlay(c) {
-  if (fl.mode !== 'play' || c === fl.grid[0][0]) return;
+  if (fl.mode !== 'play') return; if (fl.duel) return inDuel(c); if (c === fl.grid[0][0]) return;
   const before = fl.own.size, old = fl.grid.map(r => r.slice()); for (const k of fl.own) { const [x, y] = k.split(',').map(Number); fl.grid[y][x] = c; }
   fl.own = inRegion(fl.grid); fl.moves++;
   fl.flow = new Map(); for (const [k, dist] of inDist(fl.own)) { const [x, y] = k.split(',').map(Number); fl.flow.set(k, {from: old[y][x], t: fl.tick + dist * .9}); }
   beep(300 + fl.own.size * 3, .06, 'triangle', 0, .05 + Math.min(.05, (fl.own.size - before) / 400));
-  if (fl.own.size === IN.N * IN.N) { fl.mode = 'won'; fl.endAt = fl.tick; ins.won++; ins.games++; if (ins.level >= ins.top) ins.top = ins.level + 1; best('inond' + ins.level, -fl.moves); saveGames(); [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, .14, 'triangle'), i * 100)); }
-  else if (fl.moves >= fl.limit) { fl.mode = 'over'; fl.endAt = fl.tick; ins.games++; saveGames(); beep(160, .4, 'sawtooth', 80, .08); }
+  if (fl.own.size === IN.N * IN.N) { fl.mode = 'won'; fl.endAt = fl.tick;
+    if (fl.daily) { const dl = (ins.daily ??= {last: '', streak: 0, best: 0}); if (dl.last !== inDay()) { dl.streak = dl.last === inDay(1) ? dl.streak + 1 : 1; dl.best = Math.max(dl.best, dl.streak); dl.last = inDay(); } if (dl.moves == null || dl.day !== inDay() || fl.moves < dl.moves) { dl.moves = fl.moves; dl.day = inDay(); } saveGames(); }
+    else { ins.won++; ins.games++; if (ins.level >= ins.top) ins.top = ins.level + 1; best('inond' + ins.level, -fl.moves); saveGames(); } [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, .14, 'triangle'), i * 100)); }
+  else if (fl.moves >= fl.limit) { fl.mode = 'over'; fl.endAt = fl.tick; if (!fl.daily) ins.games++; saveGames(); beep(160, .4, 'sawtooth', 80, .08); }
   inInfo();
 }
 const IN_BG = cnv(W, H, b => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) px(b, (x * 3 + y * 5) % 11 === 0 ? '#0e2240' : (x + y) % 2 ? '#0a1a34' : '#08162c', x, y); px(b, '#05010b', IN.X0 - 3, IN.Y0 - 3, IN.N * IN.C + 6, IN.N * IN.C + 6); px(b, '#2e5a9a', IN.X0 - 2, IN.Y0 - 2, IN.N * IN.C + 4, 1); });
@@ -382,33 +415,51 @@ function inDraw() {
   }
   if (fl.mode === 'play') for (const k of fl.own) { if (((k.length * 7 + fl.tick) >> 3) % 23) continue; const [x, y] = k.split(',').map(Number); px(g, '#ffffff', IN.X0 + x * C + 4 + (fl.tick >> 2) % 6, IN.Y0 + y * C + 5, 3, 1); }  // des reflets qui passent sur l'eau
   for (const k of fl.own) { const [x, y] = k.split(',').map(Number); if (!fl.own.has(x + ',' + (y - 1))) px(g, '#ffffff', IN.X0 + x * IN.C, IN.Y0 + y * IN.C, IN.C, 1); if (!fl.own.has((x - 1) + ',' + y)) px(g, '#ffffff', IN.X0 + x * IN.C, IN.Y0 + y * IN.C, 1, IN.C); }  // le contour de ta tache
-  for (let k = 0; k < 6; k++) { const [x, y] = inPal(k), on = fl.hover === k && fl.mode === 'play', cur = k === fl.grid[0][0];
+  if (fl.duel) for (const k of fl.duel.own2) { const [x, y] = k.split(',').map(Number), o = fl.duel.own2, X = IN.X0 + x * IN.C, Y = IN.Y0 + y * IN.C;  // celui de l’autre, en jaune
+    if (!o.has(x + ',' + (y + 1))) px(g, '#ffd84a', X, Y + IN.C - 1, IN.C, 1); if (!o.has((x + 1) + ',' + y)) px(g, '#ffd84a', X + IN.C - 1, Y, 1, IN.C); if (!o.has(x + ',' + (y - 1))) px(g, '#ffd84a', X, Y, IN.C, 1); if (!o.has((x - 1) + ',' + y)) px(g, '#ffd84a', X, Y, 1, IN.C); }
+  for (let k = 0; k < 6; k++) { const [x, y] = inPal(k), on = fl.hover === k && fl.mode === 'play', cur = k === fl.grid[0][0] || (fl.duel && k === fl.grid[IN.N - 1][IN.N - 1]);
     px(g, on ? '#ffffff' : '#05010b', x - 1, y - 1 - (on ? 1 : 0), 35, 22); g.drawImage(IN_BTN[k], x, y - (on ? 1 : 0)); PXK.fill(g, String(k + 1), x + 4, y + 12, IN.COLS[k][2], 1);
     if (cur) { g.globalAlpha = .6; px(g, '#05010b', x, y, 33, 20); g.globalAlpha = 1; } }
-  pxFont(g, 'COUPS ' + fl.moves + ' / ' + fl.limit, IN.X0, 15, fl.limit - fl.moves <= 3 ? '#ff4a5a' : '#ffffff', 8); pxFont(g, 'NIVEAU ' + ins.level, W - 16, 15, '#a8c0e0', 8, 'right');
+  const dn = fl.duel && inNames(), tot = IN.N * IN.N;
+  if (fl.duel) { const t = fl.duel.turn, pc = n => Math.round(n / tot * 100) + ' %'; pxFont(g, (t === 0 && fl.mode === 'play' ? '▶ ' : '') + dn[0] + ' ' + pc(fl.own.size), IN.X0, 15, '#ffffff', 8); pxFont(g, dn[1] + ' ' + pc(fl.duel.own2.size) + (t === 1 && fl.mode === 'play' ? ' ◀' : ''), W - 16, 15, '#ffd84a', 8, 'right'); }
+  else { pxFont(g, 'COUPS ' + fl.moves + ' / ' + fl.limit, IN.X0, 15, fl.limit - fl.moves <= 3 ? '#ff4a5a' : '#ffffff', 8); pxFont(g, fl.daily ? 'DU JOUR' : 'NIVEAU ' + ins.level, W - 16, 15, fl.daily ? '#ffd84a' : '#a8c0e0', 8, 'right'); }
   const end = (title, col, lines) => { px(g, 'rgba(3,10,20,.8)', 0, 96, W, 82); PXK.fill(g, title, W / 2 + 2, 126, '#05010b', 2, 'center'); PXK.fill(g, title, W / 2, 124, col, 2, 'center'); lines.forEach(([t, c], i) => pxFont(g, t, W / 2, 146 + i * 16, c, 8, 'center')); };
-  if (fl.mode === 'won' && fl.tick - fl.endAt > 30) end('TOUT EST INONDÉ !', '#5fdf6a', [[fl.moves + ' coups sur ' + fl.limit, '#ffffff'], ['Clic : niveau suivant', '#ffd84a']]);
-  if (fl.mode === 'over' && fl.tick - fl.endAt > 30) end('PLUS DE COUPS', '#ff4a5a', [[Math.round(fl.own.size / (IN.N * IN.N) * 100) + ' % couvert', '#ffffff'], ['Clic : réessayer', '#ffd84a']]);
-  cv.setAttribute('aria-label', 'Inondation, niveau ' + ins.level + ' : coups ' + fl.moves + ' sur ' + fl.limit + ', ' + Math.round(fl.own.size / (IN.N * IN.N) * 100) + ' % couvert');
+  if (fl.duel && fl.mode !== 'play' && fl.tick - fl.endAt > 30) { const r = fl.duel.res; end(r < 0 ? 'ÉGALITÉ' : fl.duel.ai ? (r === 0 ? 'GAGNÉ !' : 'L’ORDI GAGNE') : dn[r] + ' GAGNE !', r === 0 || (r === 1 && !fl.duel.ai) ? '#5fdf6a' : r < 0 ? '#ffd84a' : '#ff4a5a', [[fl.own.size + ' cases contre ' + fl.duel.own2.size, '#ffffff'], ['Clic : nouvelle partie', '#ffd84a']]); }
+  else if (fl.mode === 'won' && fl.tick - fl.endAt > 30) end('TOUT EST INONDÉ !', '#5fdf6a', [[fl.moves + ' coups sur ' + fl.limit, '#ffffff'], [fl.daily ? 'Reviens demain pour une autre grille' : 'Clic : niveau suivant', '#ffd84a']]);
+  else if (fl.mode === 'over' && fl.tick - fl.endAt > 30) end('PLUS DE COUPS', '#ff4a5a', [[Math.round(fl.own.size / (IN.N * IN.N) * 100) + ' % couvert', '#ffffff'], ['Clic : réessayer', '#ffd84a']]);
+  if (fl.duel) cv.setAttribute('aria-label', 'Inondation en duel : ' + dn[0] + ' ' + fl.own.size + ' cases, ' + dn[1] + ' ' + fl.duel.own2.size + ' cases, au tour de ' + dn[fl.duel.turn]); else
+  cv.setAttribute('aria-label', 'Inondation, ' + (fl.daily ? 'grille du jour' : 'niveau ' + ins.level) + ' : coups ' + ins.level + ' : coups ' + fl.moves + ' sur ' + fl.limit + ', ' + Math.round(fl.own.size / (IN.N * IN.N) * 100) + ' % couvert');
 }
+const inNames = () => fl.duel.ai ? ['TOI', 'ORDI'] : ['J1', 'J2'];
+const inAgain = () => inNew(fl.mode === 'won' && !fl.duel && !fl.daily ? ins.level + 1 : ins.level);
 const inAt = e => { const [x, y] = cpos(e); for (let k = 0; k < 6; k++) { const [px0, py0] = inPal(k); if (x >= px0 && x < px0 + 33 && y >= py0 && y < py0 + 20) return k; } const cx = Math.floor((x - IN.X0) / IN.C), cy = Math.floor((y - IN.Y0) / IN.C); return cx >= 0 && cy >= 0 && cx < IN.N && cy < IN.N ? fl.grid[cy][cx] : -1; };
 cv.onpointermove = e => { if (fl) fl.hover = inAt(e); };
-cv.onpointerdown = e => { e.preventDefault(); if (!fl) return; if (fl.mode !== 'play') { if (fl.tick - fl.endAt > 30) inNew(fl.mode === 'won' ? ins.level + 1 : ins.level); return; } const k = inAt(e); if (k >= 0) inPlay(k); };
-document.addEventListener('keydown', e => { if (!keyOk(e) || !fl) return; const k = '123456'.indexOf(e.key); if (k >= 0) inPlay(k); if (e.key === ' ' && fl.mode !== 'play') { e.preventDefault(); inNew(fl.mode === 'won' ? ins.level + 1 : ins.level); } });
-function inInfo() { const b = games.best['inond' + ins.level]; showStats([['Niveau le plus loin', ins.top], ['Record de ce niveau', b != null ? -b + ' coups' : '—'], ['Grilles réussies', ins.won + ' / ' + ins.games]]); }
+cv.onpointerdown = e => { e.preventDefault(); if (!fl) return; if (fl.mode !== 'play') { if (fl.tick - fl.endAt > 30) inAgain(); return; } const k = inAt(e); if (k >= 0) inPlay(k); };
+document.addEventListener('keydown', e => { if (!keyOk(e) || !fl) return; const k = '123456'.indexOf(e.key); if (k >= 0) inPlay(k); if (e.key === ' ' && fl.mode !== 'play') { e.preventDefault(); inAgain(); } });
+function inInfo() { $('inMode').value = ins.mode || 'solo'; const dl = ins.daily, du = ins.duel || {w: 0, l: 0, d: 0};
+  if (fl?.daily) return showStats([['Grille du jour', dl?.last === inDay() ? 'faite ✓ en ' + dl.moves + ' coups' : 'à faire'], ['Série de jours', (dl?.last === inDay() || dl?.last === inDay(1) ? dl.streak : 0) + ' (record ' + (dl?.best || 0) + ')']]);
+  if (fl?.duel) return showStats([['Contre l’ordi', du.w + ' gagnés · ' + du.l + ' perdus' + (du.d ? ' · ' + du.d + ' nuls' : '')], ['Règle', 'plus de la moitié gagne']]);
+  const b = games.best['inond' + ins.level]; showStats([['Niveau le plus loin', ins.top], ['Record de ce niveau', b != null ? -b + ' coups' : '—'], ['Grilles réussies', ins.won + ' / ' + ins.games]]); }
 $('gNew').onclick = () => { inNew(ins.level); $('gNew').blur(); };
 $('inRnd').checked = !!ins.rnd; $('inRnd').onchange = () => { ins.rnd = $('inRnd').checked; saveGames(); inNew(ins.level); $('inRnd').blur(); };  // plans au hasard : la taille suit toujours le niveau
 
-$('inPrev').onclick = () => { if (ins.level > 1) inNew(ins.level - 1); $('inPrev').blur(); }; $('inNext').onclick = () => { if (ins.level < ins.top) inNew(ins.level + 1); $('inNext').blur(); };
+$('inMode').onchange = () => { ins.mode = $('inMode').value; saveGames(); inNew(ins.level); $('inMode').blur(); };
+$('inPrev').onclick = () => { if ((ins.mode || 'solo') !== 'solo') return; if (ins.level > 1) inNew(ins.level - 1); $('inPrev').blur(); }; $('inNext').onclick = () => { if ((ins.mode || 'solo') !== 'solo') return; if (ins.level < ins.top) inNew(ins.level + 1); $('inNext').blur(); };
 $('gFs').onclick = () => { const box = cv.parentElement; document.fullscreenElement ? document.exitFullscreen() : box.requestFullscreen?.().catch(() => {}); $('gFs').blur(); };
 function inCheck() {  // vérification : jouer la couleur la plus rentable finit toujours la grille, pas très loin de la limite ; l'eau part du coin
-  const keep = fl, ks = {...ins}, kb = {...games.best}; let ok = true, flow = true;
+  const keep = fl, ks = JSON.stringify(ins), kb = {...games.best}; let ok = true, flow = true;
   for (const lv of [1, 7, 20]) { fl = null; inNew(lv); let n = 0; while (fl.mode === 'play' && n < 60) { let bk = 0, bs = -1; for (let c = 0; c < 6; c++) { if (c === fl.grid[0][0]) continue; const gg = fl.grid.map(r => r.slice()); for (const k of fl.own) { const [x, y] = k.split(',').map(Number); gg[y][x] = c; } const s = inRegion(gg).size; if (s > bs) { bs = s; bk = c; } } fl.limit = 99; inPlay(bk); n++;
       if (n === 3) { const f = fl.flow; flow &&= f.size === fl.own.size && f.get('0,0').t === fl.tick && [...f.values()].every(v => v.t >= fl.tick); } } ok &&= fl.mode === 'won' && n <= inLimit(lv) + 12; }
-  fl = keep; Object.assign(ins, ks); games.best = kb;
-  return [ok ? '' : 'grille non finie', flow ? '' : 'écoulement', inPal(5)[0] + 33 <= W && inPal(0)[1] + 20 <= H ? '' : 'palette hors cadre'].filter(Boolean).join(' | ') || 'ok';
+  let duel = true, daily = true; const km = ins.mode;
+  for (let t = 0; t < 4; t++) { ins.mode = 'ordi'; fl = null; inNew(1); let n = 0; while (fl.mode === 'play' && n < 300) { const N = IN.N, ban = [fl.grid[0][0], fl.grid[N - 1][N - 1]];
+      if (fl.duel.turn === 0) { let c = 0; while (ban.includes(c)) c++; inDuel(c); } else { clearTimeout(inAiT); const t0 = fl.moves; inAi(); duel &&= fl.moves === t0 + 1 && !ban.includes(fl.grid[N - 1][N - 1]) || fl.mode !== 'play'; } n++; }
+    duel &&= fl.mode !== 'play' && fl.own.size + fl.duel.own2.size <= IN.N * IN.N && [...fl.own].every(k => !fl.duel.own2.has(k)); }
+  ins.mode = 'jour'; fl = null; inNew(1); const g1 = JSON.stringify(fl.grid); inNew(5); daily = g1 === JSON.stringify(fl.grid) && fl.daily && fl.limit === 28;
+  ins.mode = km; clearTimeout(inAiT);
+  fl = keep; for (const k of Object.keys(ins)) delete ins[k]; Object.assign(ins, JSON.parse(ks)); games.best = kb;
+  return [ok ? '' : 'grille non finie', duel ? '' : 'duel', daily ? '' : 'grille du jour', flow ? '' : 'écoulement', inPal(5)[0] + 33 <= W && inPal(0)[1] + 20 <= H ? '' : 'palette hors cadre'].filter(Boolean).join(' | ') || 'ok';
 }
-{ const c = inCheck(); console.assert(c === 'ok', 'inondation', c); cv.__in = {check: inCheck, st: () => fl, play: k => inPlay(k), again: () => inNew(ins.level), ins}; }
+{ const c = inCheck(); console.assert(c === 'ok', 'inondation', c); cv.__in = {check: inCheck, st: () => fl, play: k => inPlay(k), ai: () => { clearTimeout(inAiT); inAi(); }, again: () => inNew(ins.level), ins}; }
 ctx.onOpen(() => { if (!fl) inNew(); gameLoop(fl, 'inondation', () => {}, inDraw); inInfo(); });
 
 }
