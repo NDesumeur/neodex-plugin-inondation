@@ -300,6 +300,9 @@ export default async function (ctx) {
   const saveGames = () => { clearTimeout(gamesTimer); gamesTimer = setTimeout(() => { gamesTimer = null; folder.write('games', games).catch(() => {}); }, 500); };
   const best = (k, v) => { const b = games.best[k]; if (b == null || v > b) { games.best[k] = v; saveGames(); return true; } return false; };
   const gstore = (k, init) => (games[k] ??= init);
+  // les trophées de NeoDex (3.4.8 et plus) : succès et records déclarés dans plugin.json ; sur un NeoDex plus ancien, rien ne se passe
+  const trophy = id => { ctx.games?.unlock(id).catch(() => {}); };
+  const trophyRecord = (id, v) => { if (v != null && Number.isFinite(+v)) ctx.games?.record(id, +v).catch(() => {}); };
 function gameLoop(st, appKey, update, draw) {
   cancelAnimationFrame(st.raf);
   const STEP = 1000 / 60; let acc = 0, last = performance.now();
@@ -436,7 +439,8 @@ const inAt = e => { const [x, y] = cpos(e); for (let k = 0; k < 6; k++) { const 
 cv.onpointermove = e => { if (fl) fl.hover = inAt(e); };
 cv.onpointerdown = e => { e.preventDefault(); if (!fl) return; if (fl.mode !== 'play') { if (fl.tick - fl.endAt > 30) inAgain(); return; } const k = inAt(e); if (k >= 0) inPlay(k); };
 document.addEventListener('keydown', e => { if (!keyOk(e) || !fl) return; const k = '123456'.indexOf(e.key); if (k >= 0) inPlay(k); if (e.key === ' ' && fl.mode !== 'play') { e.preventDefault(); inAgain(); } });
-function inInfo() { $('inMode').value = ins.mode || 'solo'; const dl = ins.daily, du = ins.duel || {w: 0, l: 0, d: 0};
+function inInfo() {
+  setTimeout(inTrophies); $('inMode').value = ins.mode || 'solo'; const dl = ins.daily, du = ins.duel || {w: 0, l: 0, d: 0};
   if (fl?.daily) return showStats([['Grille du jour', dl?.last === inDay() ? 'faite ✓ en ' + dl.moves + ' coups' : 'à faire'], ['Série de jours', (dl?.last === inDay() || dl?.last === inDay(1) ? dl.streak : 0) + ' (record ' + (dl?.best || 0) + ')']]);
   if (fl?.duel) return showStats([['Contre l’ordi', du.w + ' gagnés · ' + du.l + ' perdus' + (du.d ? ' · ' + du.d + ' nuls' : '')], ['Règle', 'plus de la moitié gagne']]);
   const b = games.best['inond' + ins.level]; showStats([['Niveau le plus loin', ins.top], ['Record de ce niveau', b != null ? -b + ' coups' : '—'], ['Grilles réussies', ins.won + ' / ' + ins.games]]); }
@@ -460,6 +464,13 @@ function inCheck() {  // vérification : jouer la couleur la plus rentable finit
   return [ok ? '' : 'grille non finie', duel ? '' : 'duel', daily ? '' : 'grille du jour', flow ? '' : 'écoulement', inPal(5)[0] + 33 <= W && inPal(0)[1] + 20 <= H ? '' : 'palette hors cadre'].filter(Boolean).join(' | ') || 'ok';
 }
 { const c = inCheck(); console.assert(c === 'ok', 'inondation', c); cv.__in = {check: inCheck, st: () => fl, play: k => inPlay(k), ai: () => { clearTimeout(inAiT); inAi(); }, again: () => inNew(ins.level), ins}; }
+// les trophées, tirés des statistiques et des records gardés (aussi à l'ouverture : ce qui a été fait avant compte)
+function inTrophies() {
+  const t = ins.won ? ins.top : 0, dl = ins.daily || {}, sig = [ins.won, t, dl.best, ins.duel?.w].join(); if (sig === inTrophies.sig) return; inTrophies.sig = sig;
+  trophyRecord('niveau', t || null); trophyRecord('serie', dl.best || null);
+  if (ins.won >= 1) trophy('premier'); if (t >= 10) trophy('n10'); if (t >= 25) trophy('n25'); if (ins.won >= 50) trophy('cinquante');
+  if (dl.best >= 1) trophy('jour'); if (dl.best >= 7) trophy('jour7'); if (ins.duel?.w) trophy('duel');
+}
 ctx.onOpen(() => { if (!fl) inNew(); gameLoop(fl, 'inondation', () => {}, inDraw); inInfo(); });
 
 }

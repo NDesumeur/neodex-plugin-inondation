@@ -111,5 +111,20 @@
  "vérification ok · 6 coups à la palette,": "check ok · 6 moves on the palette,",
  "cases inondées · fin sans coups · plein écran ·": "cells flooded · end with no moves · fullscreen ·",
  "px dans": "px in",
- "Casse-tête de couleurs : ta tache part du coin, prend la couleur choisie et avale ses voisines de même couleur. Couvre les 196 cases de la grille dans le nombre de coups permis, de 30 au niveau 1 jusqu'à 22. Une grille fixe par niveau pour battre ton record, ou des grilles au hasard ; couleurs au clic ou aux touches 1 à 6, avec un motif par couleur et le chiffre de sa touche. Grandes cases, l'eau qui s'écoule depuis le coin à chaque coup, jeu à la taille de l'écran et plein écran. Un duel contre l’ordi ou à deux, et une grille du jour.": "A colour puzzle: your patch starts in the corner, takes the chosen colour and swallows its neighbours of the same colour. Cover all 196 cells of the grid within the allowed moves, from 30 at level 1 down to 22. A fixed grid per level to beat your record, or random grids; colours by click or keys 1 to 6, with a pattern for each colour and the number of its key. Big cells, water that flows from the corner on each move, a game that fits the screen, and full screen. A duel against the computer or two players, and a daily grid."
+ "Casse-tête de couleurs : ta tache part du coin, prend la couleur choisie et avale ses voisines de même couleur. Couvre les 196 cases de la grille dans le nombre de coups permis, de 30 au niveau 1 jusqu'à 22. Une grille fixe par niveau pour battre ton record, ou des grilles au hasard ; couleurs au clic ou aux touches 1 à 6, avec un motif par couleur et le chiffre de sa touche. Grandes cases, l'eau qui s'écoule depuis le coin à chaque coup, jeu à la taille de l'écran et plein écran. Un duel contre l’ordi ou à deux, et une grille du jour.": "A colour puzzle: your patch starts in the corner, takes the chosen colour and swallows its neighbours of the same colour. Cover all 196 cells of the grid within the allowed moves, from 30 at level 1 down to 22. A fixed grid per level to beat your record, or random grids; colours by click or keys 1 to 6, with a pattern for each colour and the number of its key. Big cells, water that flows from the corner on each move, a game that fits the screen, and full screen. A duel against the computer or two players, and a daily grid.",
+ "Tout recouvert": "All covered",
+ "Réussir une première grille": "Clear your first grid",
+ "Marée montante": "Rising tide",
+ "Atteindre le niveau 10": "Reach level 10",
+ "Déluge": "Deluge",
+ "Atteindre le niveau 25": "Reach level 25",
+ "Peintre en bâtiment": "House painter",
+ "Réussir 50 grilles": "Clear 50 grids",
+ "La grille du jour": "Grid of the day",
+ "Réussir une grille du jour": "Clear a grid of the day",
+ "Une semaine de couleurs": "A week of colours",
+ "Réussir la grille du jour 7 jours de suite": "Clear the grid of the day 7 days in a row",
+ "Plus de la moitié": "More than half",
+ "Battre l'ordinateur en duel": "Beat the computer in a duel",
+ "Plus longue série de jours": "Longest day streak"
 }
