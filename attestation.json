@@ -1,9 +1,9 @@
 {
   "pluginId": "neodex.inondation",
   "repo": "NDesumeur/neodex-plugin-inondation",
-  "version": "1.2.0",
-  "sha256": "f94d42b53b6b9fdc7c9e8cfd7652f1320848e1410a3736f855f9b50e7eaf3702",
-  "approvedAt": "2026-11-24T15:56:17.787Z",
+  "version": "1.3.0",
+  "sha256": "02360dc03ec8f97cc2687e6653c3d357c47ce53bd6973f77c264a7a7ab1eb47a",
+  "approvedAt": "2026-11-25T17:16:42.945Z",
   "neobase": ">=4.0.0",
-  "signature": "8GiHvzDsR02hwifzS20xoFGsj/lG7qJBp9WZmVc+NPuFjloU1LEFG0SthYzaMDUzOLJ9C/ZkjAd75gMKVzpuAw=="
+  "signature": "orlD6F8KBAfBMbu6PM5+yEGOjpYHrUeGi6Zvt7sb4JIsyRAQfG28Isg9dUsF8pkINNv+k386lH+Ei3B0ig5LAw=="
 }
